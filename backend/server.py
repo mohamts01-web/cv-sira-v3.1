@@ -57,8 +57,9 @@ def create_refresh_token(user_id: str) -> str:
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
-    response.set_cookie("access_token", access_token, httponly=True, secure=False, samesite="lax", max_age=86400, path="/")
-    response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+    is_secure = os.environ.get("FRONTEND_URL", "").startswith("https")
+    response.set_cookie("access_token", access_token, httponly=True, secure=is_secure, samesite="none" if is_secure else "lax", max_age=86400, path="/")
+    response.set_cookie("refresh_token", refresh_token, httponly=True, secure=is_secure, samesite="none" if is_secure else "lax", max_age=604800, path="/")
 
 def user_to_dict(user: dict) -> dict:
     user["id"] = str(user.pop("_id"))
@@ -181,8 +182,10 @@ async def login(body: LoginRequest, request: Request, response: Response):
 
 @api_router.post("/auth/logout")
 async def logout(response: Response):
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+    is_secure = os.environ.get("FRONTEND_URL", "").startswith("https")
+    same = "none" if is_secure else "lax"
+    response.delete_cookie("access_token", path="/", samesite=same, secure=is_secure)
+    response.delete_cookie("refresh_token", path="/", samesite=same, secure=is_secure)
     return {"message": "Logged out"}
 
 
@@ -456,7 +459,7 @@ app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.environ.get("CORS_ORIGINS", "").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

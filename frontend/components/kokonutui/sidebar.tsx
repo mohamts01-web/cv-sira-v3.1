@@ -71,9 +71,9 @@ export default function Sidebar() {
           >
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center">
-                <span className="text-zinc-950 dark:text-white font-bold text-sm">A</span>
+                <span className="text-zinc-950 dark:text-white font-bold text-sm">C</span>
               </div>
-              <span className="text-lg font-semibold text-gray-900 dark:text-white">Apex</span>
+              <span className="text-lg font-semibold text-gray-900 dark:text-white">CvSira</span>
             </div>
           </Link>
 

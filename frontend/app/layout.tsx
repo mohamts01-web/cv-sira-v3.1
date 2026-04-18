@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Manrope, Syne, Instrument_Sans } from "next/font/google"
+import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
 const manrope = Manrope({
@@ -31,10 +32,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${manrope.variable} ${syne.variable} ${instrumentSans.variable} font-sans antialiased`}>
-        <div className="noise-overlay" aria-hidden="true" />
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   )

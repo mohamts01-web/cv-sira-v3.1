@@ -1,74 +1,65 @@
-# Landing Page + Dashboard - Next.js
+# CvSira - SaaS Platform
 
 ## Project Overview
-**Apex** - Enterprise SaaS Platform with Landing Page and Financial Dashboard.
-Built with Next.js 15 (App Router) + TypeScript + Tailwind CSS v4.
+**CvSira** - منصة السيرة الذاتية الذكية - SaaS platform with AI-powered CV generation, points-based service system, user plans, and admin management.
 
 ## Routes
-- `/` → Landing Page (dark theme, Apex SaaS)
-- `/dashboard` → KokonutUI Financial Dashboard (dark/light toggle)
+- `/`          → Landing page (Apex-style dark SaaS landing)
+- `/login`     → Login page (Arabic, purple design)
+- `/signup`    → Signup page (Arabic, purple design)
+- `/dashboard` → User dashboard (KokonutUI - protected)
+- `/admin`     → Admin panel (admin role only)
 
 ## Architecture
 - **Frontend**: Next.js 15 (App Router) + TypeScript + Tailwind CSS v4
 - **Backend**: FastAPI (Python) on port 8001
-- **Database**: MongoDB
+- **Database**: MongoDB (`cvsira_db`)
+- **Auth**: JWT (httpOnly cookies) + bcrypt password hashing
 
-## Project Structure (Frontend `/app/frontend/`)
-```
-app/
-├── layout.tsx          # Root layout (ThemeProvider, Google Fonts)
-├── page.tsx            # Landing page (/)
-├── globals.css         # Global styles + Tailwind v4
-└── dashboard/
-    └── page.tsx        # Dashboard page (/dashboard)
-
-components/
-├── navbar.tsx          # Landing page floating navbar
-├── hero.tsx            # Hero section with animations
-├── logo-marquee.tsx    # Scrolling logos
-├── bento-grid.tsx      # Features bento grid
-├── pricing.tsx         # Pricing cards
-├── final-cta.tsx       # Final call to action
-├── footer.tsx          # Footer
-├── smooth-scroll.tsx   # Lenis smooth scroll
-├── theme-provider.tsx  # next-themes provider
-├── theme-toggle.tsx    # Dark/Light toggle button
-├── kokonutui/
-│   ├── dashboard.tsx   # Root dashboard component
-│   ├── layout.tsx      # Dashboard layout (sidebar + topnav)
-│   ├── sidebar.tsx     # Left sidebar navigation
-│   ├── top-nav.tsx     # Top navigation bar
-│   ├── content.tsx     # Main dashboard content
-│   ├── list-01.tsx     # Accounts widget
-│   ├── list-02.tsx     # Recent Transactions widget
-│   ├── list-03.tsx     # Financial Goals widget
-│   └── profile-01.tsx  # User profile dropdown
-└── ui/                 # shadcn/ui components
-```
-
-## Key Dependencies
-- `next`: 15.x
-- `framer-motion`: ^11.0 (landing page animations)
-- `lenis`: 1.3.17 (smooth scrolling)
+## Tech Stack
+- `next`: 15.x + App Router
+- `framer-motion`: landing page animations
+- `lenis`: smooth scrolling
 - `tailwindcss`: v4 + tw-animate-css
 - `next-themes`: dark/light mode
-- `@radix-ui/*`: UI primitives
+- `@radix-ui/*`: UI primitives (shadcn/ui)
+- `PyJWT` + `bcrypt`: auth backend
+
+## Database Collections
+- `users`: {name, email, password_hash, role, plan_name, plan_id, points, created_at}
+- `plans`: {name, points, price, features, is_active, created_at}
+- `login_attempts`: brute force tracking {identifier, count, lockout_until}
+
+## Default Plans (seeded on startup)
+| Plan       | Points | Price  |
+|------------|--------|--------|
+| Free       | 5      | $0     |
+| Pro        | 100    | $29/mo |
+| Enterprise | 500    | $99/mo |
 
 ## What's Implemented
-- [2026-04-18] Initial setup: Landing page from ZIP, Next.js 15 running on port 3000
-- [2026-04-18] Dashboard: KokonutUI financial dashboard at /dashboard
-  - Accounts panel with total balance
-  - Recent Transactions panel
-  - Financial Goals/Upcoming Events panel
-  - Sidebar navigation with all sections
-  - Top nav with theme toggle, notifications, user profile
-  - Full dark/light mode support
+- [2026-04-18] Landing page: ZIP → Next.js 15 setup, Apex SaaS design
+- [2026-04-18] Dashboard: KokonutUI financial dashboard at /dashboard, company name = CvSira
+- [2026-04-18] Full Auth system: register, login, logout, me, refresh + brute force protection
+- [2026-04-18] Login/Signup pages: Arabic RTL, purple gradient design
+- [2026-04-18] Admin panel: user management, plan management, stats overview
+- [2026-04-18] AuthContext: client-side auth state management
+- [2026-04-18] Protected routes: /dashboard and /admin redirect if unauthenticated
 
-## Env Variables
-- `REACT_APP_BACKEND_URL`: Backend API URL
+## Backlog / P0
+- AI-powered CV generation service (user's main product)
+- Services/Store page with point consumption
+- User profile/settings page
+- Google OAuth (locked for now)
+- Plan upgrade flow (Stripe payment)
 
-## Backlog / Future
-- Add custom font files (CalSans, InstrumentSans) for exact design match
-- Connect backend API (auth, real data)
-- Add more dashboard pages (Analytics, Transactions detail, etc.)
-- SEO optimization for landing page
+## P1
+- User can see their remaining points in dashboard
+- Notifications system
+- Email notifications on registration
+- Password reset flow
+
+## P2
+- Analytics charts in admin panel
+- Activity logs
+- Multi-language support (Arabic/English)

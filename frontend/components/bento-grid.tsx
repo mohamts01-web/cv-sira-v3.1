@@ -163,10 +163,10 @@ export function BentoGrid() {
               <SystemStatus />
             </div>
             <div className="grid grid-cols-4 gap-4">
-              {["CPU", "Memory", "Network", "Storage"].map((metric) => (
-                <div key={metric} className="text-center">
-                  <div className="text-2xl font-bold text-white mb-1">{Math.floor(Math.random() * 40 + 60)}%</div>
-                  <div className="text-xs text-zinc-500">{metric}</div>
+              {[{ label: "CPU", value: 61 }, { label: "Memory", value: 92 }, { label: "Network", value: 99 }, { label: "Storage", value: 73 }].map((metric) => (
+                <div key={metric.label} className="text-center">
+                  <div className="text-2xl font-bold text-white mb-1">{metric.value}%</div>
+                  <div className="text-xs text-zinc-500">{metric.label}</div>
                 </div>
               ))}
             </div>

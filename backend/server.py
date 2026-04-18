@@ -10,6 +10,7 @@ import logging
 import bcrypt
 import jwt
 import secrets
+import fal_client
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from pydantic import BaseModel, EmailStr, Field
@@ -224,6 +225,97 @@ async def get_plans():
     for p in plans:
         p["id"] = str(p.pop("_id"))
     return plans
+
+
+class InfographicRequest(BaseModel):
+    prompt: str
+    image_size: str = "landscape_16_9"
+    num_images: int = 1
+
+
+# ─── Services Routes ─────────────────────────────────────────────────────────
+
+POINTS_PER_IMAGE = 2
+
+# Mock placeholder images for demo (when no FAL_KEY is set)
+MOCK_IMAGES = [
+    {"url": "https://images.unsplash.com/photo-1735471828697-b8d8abd8f84f?w=1280&h=720&fit=crop", "width": 1280, "height": 720},
+    {"url": "https://images.unsplash.com/photo-1682687982501-1e58ab814714?w=1280&h=720&fit=crop", "width": 1280, "height": 720},
+    {"url": "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=1280&h=720&fit=crop", "width": 1280, "height": 720},
+    {"url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1280&h=720&fit=crop", "width": 1280, "height": 720},
+]
+
+
+@api_router.post("/services/infographic/generate")
+async def generate_infographic(body: InfographicRequest, request: Request):
+    user = await get_current_user(request)
+    user_id = user["id"]
+
+    cost = POINTS_PER_IMAGE * body.num_images
+
+    # Check points
+    db_user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not db_user:
+        raise HTTPException(404, "User not found")
+    current_points = db_user.get("points", 0)
+    if current_points < cost:
+        raise HTTPException(400, f"نقاطك غير كافية. تحتاج {cost} نقطة، لديك {current_points} نقطة")
+
+    fal_key = os.environ.get("FAL_KEY", "").strip()
+
+    if fal_key:
+        # Real fal.ai generation
+        try:
+            os.environ["FAL_KEY"] = fal_key
+            result = await fal_client.subscribe_async(
+                "fal-ai/bytedance/seedream/v4.5/text-to-image",
+                arguments={
+                    "prompt": body.prompt,
+                    "image_size": body.image_size,
+                    "num_images": body.num_images,
+                },
+            )
+            images = result.get("images", [])
+        except Exception as e:
+            raise HTTPException(500, f"خطأ في توليد الصورة: {str(e)}")
+    else:
+        # Mock mode - return placeholder images
+        import random
+        images = random.sample(MOCK_IMAGES, min(body.num_images, len(MOCK_IMAGES)))
+
+    # Deduct points
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$inc": {"points": -cost}}
+    )
+
+    # Log usage
+    await db.service_usage.insert_one({
+        "user_id": user_id,
+        "service": "infographic",
+        "prompt": body.prompt,
+        "num_images": body.num_images,
+        "points_used": cost,
+        "mock_mode": not bool(fal_key),
+        "created_at": datetime.now(timezone.utc),
+    })
+
+    return {
+        "images": images,
+        "points_used": cost,
+        "remaining_points": current_points - cost,
+        "mock_mode": not bool(fal_key),
+    }
+
+
+@api_router.get("/services/infographic/history")
+async def get_infographic_history(request: Request):
+    user = await get_current_user(request)
+    history = await db.service_usage.find(
+        {"user_id": user["id"], "service": "infographic"},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(20).to_list(20)
+    return history
 
 
 # ─── Admin Routes ────────────────────────────────────────────────────────────

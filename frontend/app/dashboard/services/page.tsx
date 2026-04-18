@@ -14,6 +14,17 @@ const services = [
     badge: "جديد",
   },
   {
+    id: "infographic-editor",
+    title: "محرر الإنفوجرافيك AI",
+    description: "محرر كامل لتصميم الإنفوجرافيك بالذكاء الاصطناعي مع Fabric.js - تحرير، طبقات، تصدير",
+    icon: Sparkles,
+    color: "from-violet-600 to-purple-700",
+    cost: "5 نقاط / توليد",
+    href: "/dashboard/services/infographic-editor",
+    status: "active",
+    badge: "AI",
+  },
+  {
     id: "cv",
     title: "مولّد السيرة الذاتية",
     description: "أنشئ سيرة ذاتية احترافية بالذكاء الاصطناعي في ثوانٍ",

@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
@@ -11,10 +12,11 @@ import bcrypt
 import jwt
 import secrets
 import fal_client
+import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List, Any
 
 ROOT_DIR = Path(__file__).parent
 
@@ -104,6 +106,11 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+class InfographicRequest(BaseModel):
+    prompt: str
+    image_size: str = "landscape_16_9"
+    num_images: int = 1
 
 class PlanCreate(BaseModel):
     name: str
@@ -230,7 +237,143 @@ async def get_plans():
     return plans
 
 
-class InfographicRequest(BaseModel):
+class InfographicAIRequest(BaseModel):
+    prompt: str
+    theme: str = "violet"
+    size: str = "a4"
+    style: str = "auto"
+
+
+CANVAS_SIZES = {
+    "a4": {"width": 800, "height": 1100},
+    "square": {"width": 1080, "height": 1080},
+    "wide": {"width": 1920, "height": 600},
+}
+
+THEME_COLORS = {
+    "violet": {"primary": "#7c3aed", "secondary": "#4f46e5", "accent": "#a855f7"},
+    "orange": {"primary": "#ea580c", "secondary": "#f97316", "accent": "#fb923c"},
+    "teal": {"primary": "#0d9488", "secondary": "#14b8a6", "accent": "#2dd4bf"},
+    "rose": {"primary": "#e11d48", "secondary": "#f43f5e", "accent": "#fb7185"},
+    "slate": {"primary": "#475569", "secondary": "#64748b", "accent": "#94a3b8"},
+}
+
+INFOGRAPHIC_AI_COST = 5  # points per generation
+
+
+@api_router.post("/services/infographic-ai/generate")
+async def generate_infographic_ai(body: InfographicAIRequest, request: Request):
+    user = await get_current_user(request)
+    user_id = user["id"]
+
+    db_user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not db_user:
+        raise HTTPException(404, "User not found")
+
+    current_points = db_user.get("points", 0)
+    if current_points < INFOGRAPHIC_AI_COST:
+        raise HTTPException(400, f"نقاطك غير كافية. تحتاج {INFOGRAPHIC_AI_COST} نقطة، لديك {current_points} نقطة")
+
+    canvas = CANVAS_SIZES.get(body.size, CANVAS_SIZES["a4"])
+    colors = THEME_COLORS.get(body.theme, THEME_COLORS["violet"])
+    w, h = canvas["width"], canvas["height"]
+
+    llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
+    if not llm_key:
+        raise HTTPException(500, "LLM key not configured")
+
+    system_prompt = f"""You are a world-class infographic designer. Generate structured JSON for a Fabric.js canvas infographic.
+
+CANVAS: {w}×{h}px
+COLORS: Primary {colors['primary']}, Secondary {colors['secondary']}, Accent {colors['accent']}
+THEME: {body.theme}, STYLE: {body.style}, SIZE: {body.size}
+
+RULES:
+1. Return ONLY valid JSON matching the schema below - no markdown, no explanations
+2. elements array sorted by zIndex ascending
+3. Start with full-canvas background rect at zIndex 0
+4. 30-55 elements total
+5. Include real facts and statistics
+6. Use null for unused stroke/strokeWidth
+7. All coordinates within canvas bounds (0 to {w} x, 0 to {h} y)
+
+SCHEMA:
+{{
+  "canvasWidth": number,
+  "canvasHeight": number,
+  "background": "#hexcolor",
+  "elements": [
+    {{"type":"rect","id":"unique","x":0,"y":0,"width":{w},"height":{h},"fill":"#color","rx":0,"opacity":1,"stroke":null,"strokeWidth":null,"zIndex":0}},
+    {{"type":"circle","id":"unique","x":100,"y":100,"radius":50,"fill":"#color","opacity":1,"stroke":null,"strokeWidth":null,"zIndex":1}},
+    {{"type":"text","id":"unique","x":50,"y":50,"text":"Title","fontSize":32,"fontWeight":"bold","fontFamily":"Arial","fill":"#color","textAlign":"center","width":700,"opacity":1,"zIndex":2}},
+    {{"type":"stat","id":"unique","x":50,"y":200,"width":180,"height":80,"value":"95%","label":"Success Rate","valueFill":"#color","labelFill":"#color","bgFill":"#color","rx":12,"zIndex":3}},
+    {{"type":"icon","id":"unique","x":100,"y":300,"emoji":"🚀","emojiSize":32,"bgFill":"#color","bgRadius":30,"zIndex":4}},
+    {{"type":"line","id":"unique","x1":50,"y1":400,"x2":750,"y2":400,"stroke":"#color","strokeWidth":2,"dashed":false,"zIndex":5}}
+  ]
+}}"""
+
+    async def generate_stream():
+        try:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            chat = LlmChat(
+                api_key=llm_key,
+                session_id=f"infographic-{user_id}-{datetime.now().timestamp()}",
+                system_message=system_prompt,
+            ).with_model("gemini", "gemini-2.5-flash")
+
+            user_msg = UserMessage(
+                text=f'Create a professional {body.style} style infographic about: "{body.prompt}". Canvas: {w}x{h}px. Return ONLY the JSON object.'
+            )
+
+            response_text = await chat.send_message(user_msg)
+
+            # Clean response - remove markdown if present
+            text = response_text.strip()
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
+
+            # Parse and validate basic structure
+            data = json.loads(text)
+            if "elements" not in data:
+                raise ValueError("Invalid response structure")
+
+            # Deduct points
+            await db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$inc": {"points": -INFOGRAPHIC_AI_COST}}
+            )
+
+            # Log usage
+            await db.service_usage.insert_one({
+                "user_id": user_id,
+                "service": "infographic-ai",
+                "prompt": body.prompt,
+                "points_used": INFOGRAPHIC_AI_COST,
+                "created_at": datetime.now(timezone.utc),
+            })
+
+            # Stream as NDJSON (send full object as one chunk, then done)
+            yield json.dumps(data) + "\n"
+
+        except json.JSONDecodeError as e:
+            yield json.dumps({"error": f"Failed to parse AI response: {str(e)}"}) + "\n"
+        except Exception as e:
+            logger.error(f"Infographic AI error: {e}")
+            yield json.dumps({"error": str(e)}) + "\n"
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/plain; charset=utf-8",
+        headers={"Transfer-Encoding": "chunked"}
+    )
+
+
+
     prompt: str
     image_size: str = "landscape_16_9"
     num_images: int = 1

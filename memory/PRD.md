@@ -1,66 +1,52 @@
 # CvSira - SaaS Platform
 
 ## Project Overview
-**CvSira** - منصة السيرة الذاتية الذكية - SaaS platform with AI-powered services, points-based system, user plans, and admin management.
+**CvSira** - منصة السيرة الذاتية الذكية
 
 ## Routes
-- `/`                                    → Landing page
-- `/login`                               → Login (Arabic, purple design)
-- `/signup`                              → Signup (Arabic, purple design)
-- `/dashboard`                           → User dashboard (KokonutUI)
-- `/dashboard/services`                  → All services catalog
-- `/dashboard/services/infographic`      → AI Infographic Generator ✅ ACTIVE
-- `/admin`                               → Admin panel (admin role only)
+- `/`                                          → Landing page
+- `/login`                                     → Login
+- `/signup`                                    → Signup
+- `/dashboard`                                 → User dashboard
+- `/dashboard/services`                        → All services catalog
+- `/dashboard/services/infographic`            → AI Image Generator (fal.ai mock)
+- `/dashboard/services/infographic-editor`     → AI Infographic Editor (Fabric.js + Gemini) ✅
+- `/admin`                                     → Admin panel
 
 ## Architecture
-- **Frontend**: Next.js 15 (App Router) + TypeScript + Tailwind CSS v4
-- **Backend**: FastAPI (Python) on port 8001
-- **Database**: MongoDB (`cvsira_db`)
-- **Auth**: JWT (httpOnly cookies) + bcrypt
+- **Frontend**: Next.js 15 + TypeScript + Tailwind CSS v4
+- **Backend**: FastAPI (Python) + MongoDB (`cvsira_db`)
+- **Auth**: JWT (httpOnly cookies, SameSite=none, Secure)
 
-## Services System
-| Service | Status | Points Cost | Model |
-|---------|--------|-------------|-------|
-| AI Infographic | Active (Mock mode) | 2 نقطة/صورة | ByteDance SeedDream v4.5 via fal.ai |
-| CV Generator | Coming Soon | TBD | TBD |
-| Cover Letter | Coming Soon | TBD | TBD |
+## Services
+| Service | Cost | Status |
+|---------|------|--------|
+| AI Image Generator | 2 نقطة/صورة | Active (Mock) |
+| AI Infographic Editor | 5 نقاط/توليد | Active (Gemini 2.5 Flash) |
+| CV Generator | TBD | Coming Soon |
+| Cover Letter | TBD | Coming Soon |
 
-**To activate real fal.ai generation:** Set `FAL_KEY=your-key` in `/app/backend/.env`
-
-## Database Collections
-- `users`: {name, email, password_hash, role, plan_name, plan_id, points, created_at}
-- `plans`: {name, points, price, features, is_active, created_at}
-- `login_attempts`: brute force tracking
-- `service_usage`: {user_id, service, prompt, num_images, points_used, mock_mode, created_at}
-
-## Default Plans (seeded on startup)
-| Plan       | Points | Price  |
-|------------|--------|--------|
-| Free       | 5      | $0     |
-| Pro        | 100    | $29/mo |
-| Enterprise | 500    | $99/mo |
+## Infographic Editor Stack
+- `fabric` v6.6.1 - Canvas editing
+- Gemini 2.5 Flash via emergentintegrations - AI generation
+- Backend streams NDJSON, frontend renders elements progressively
+- Features: Layers, Properties, Toolbar, Zoom, Export PNG/JSON, Undo/Redo
 
 ## What's Implemented
 - [2026-04-18] Landing page + Next.js 15 setup
-- [2026-04-18] KokonutUI Dashboard, CvSira branding
-- [2026-04-18] Full Auth: register, login, logout, JWT, brute force protection
-- [2026-04-18] Login/Signup pages: Arabic RTL, purple gradient
-- [2026-04-18] Admin panel: user mgmt, plan mgmt, stats
-- [2026-04-18] AI Infographic service: mock mode + fal.ai ready, points deduction, usage logging
+- [2026-04-18] KokonutUI Dashboard + CvSira branding
+- [2026-04-18] Auth system (JWT, bcrypt, brute force)
+- [2026-04-18] Login/Signup pages (Arabic RTL)
+- [2026-04-18] Admin panel (users, plans, stats)
+- [2026-04-18] AI Image Generator service (fal.ai mock)
+- [2026-04-18] AI Infographic Editor (Fabric.js + Gemini 2.5 Flash)
 
-## Backlog / P0
-- CV generation service (main product)
-- Services/Store page improvements
-- Plan upgrade flow with payment (Stripe)
-- FAL_KEY activation for real image generation
+## Backlog P0
+- CV generation service
+- Plan upgrade + Stripe payment
+- fal.ai key activation
 
-## P1
-- User profile/settings page
-- Points history / usage history page
+## Backlog P1
+- User profile page
+- Points history
 - Google OAuth
-- Email on registration
-
-## P2
-- Analytics in admin panel
-- Notifications system
-- Multi-language (Arabic/English)

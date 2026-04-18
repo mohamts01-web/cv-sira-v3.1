@@ -100,6 +100,9 @@ export default function Sidebar() {
                 <NavItem href="/dashboard/services/infographic" icon={Sparkles} badge="جديد">
                   مولّد الإنفوجرافيك
                 </NavItem>
+                <NavItem href="/dashboard/services/infographic-editor" icon={Sparkles} badge="AI">
+                  محرر الإنفوجرافيك AI
+                </NavItem>
               </div>
             </div>
 

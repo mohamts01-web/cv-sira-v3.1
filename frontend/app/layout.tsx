@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Manrope, Syne, Instrument_Sans } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/lib/auth-context"
+import { ServiceWorkerCleaner } from "@/components/sw-cleaner"
 import "./globals.css"
 
 const manrope = Manrope({
@@ -35,6 +36,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${manrope.variable} ${syne.variable} ${instrumentSans.variable} font-sans antialiased`}>
+        <ServiceWorkerCleaner />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <AuthProvider>
             {children}

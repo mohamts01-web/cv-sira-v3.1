@@ -2,10 +2,11 @@
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Image from "next/image"
-import { Bell, ChevronRight } from "lucide-react"
+import { Bell, ChevronRight, User } from "lucide-react"
 import Profile01 from "./profile-01"
 import Link from "next/link"
 import { ThemeToggle } from "../theme-toggle"
+import { useAuth } from "@/lib/auth-context"
 
 interface BreadcrumbItem {
   label: string
@@ -13,6 +14,7 @@ interface BreadcrumbItem {
 }
 
 export default function TopNav() {
+  const { user } = useAuth()
   const breadcrumbs: BreadcrumbItem[] = [
     { label: "CvSira", href: "/" },
     { label: "Dashboard", href: "/dashboard" },
@@ -50,20 +52,20 @@ export default function TopNav() {
 
         <DropdownMenu>
           <DropdownMenuTrigger className="focus:outline-none">
-            <Image
-              src="https://ferf1mheo22r9ira.public.blob.vercel-storage.com/avatar-01-n0x8HFv8EUetf9z6ht0wScJKoTHqf8.png"
-              alt="User avatar"
-              width={28}
-              height={28}
-              className="rounded-full ring-2 ring-gray-200 dark:ring-[#2B2B30] sm:w-8 sm:h-8 cursor-pointer"
-            />
+            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center ring-2 ring-gray-200 dark:ring-[#2B2B30] cursor-pointer">
+              <User className="h-4 w-4 text-white" />
+            </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
             sideOffset={8}
             className="w-[280px] sm:w-80 bg-background border-border rounded-lg shadow-lg"
           >
-            <Profile01 avatar="https://ferf1mheo22r9ira.public.blob.vercel-storage.com/avatar-01-n0x8HFv8EUetf9z6ht0wScJKoTHqf8.png" />
+            <Profile01
+              name={user?.name || "المستخدم"}
+              role={user?.plan_name || "Free"}
+              points={user?.points ?? 0}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -1,89 +1,371 @@
-from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
+load_dotenv()
+
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
 import os
 import logging
+import bcrypt
+import jwt
+import secrets
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
-from datetime import datetime, timezone
-
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+# MongoDB
+mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.environ["DB_NAME"]]
 
-# Create the main app without a prefix
-app = FastAPI()
-
-# Create a router with the /api prefix
+app = FastAPI(title="CvSira API")
 api_router = APIRouter(prefix="/api")
 
+JWT_ALGORITHM = "HS256"
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
+# ─── Helpers ────────────────────────────────────────────────────────────────
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+def get_jwt_secret() -> str:
+    return os.environ["JWT_SECRET"]
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode(), salt).decode()
 
-# Include the router in the main app
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
+
+def create_access_token(user_id: str, email: str) -> str:
+    payload = {"sub": user_id, "email": email,
+               "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+               "type": "access"}
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+def create_refresh_token(user_id: str) -> str:
+    payload = {"sub": user_id,
+               "exp": datetime.now(timezone.utc) + timedelta(days=7),
+               "type": "refresh"}
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
+    response.set_cookie("access_token", access_token, httponly=True, secure=False, samesite="lax", max_age=86400, path="/")
+    response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+
+def user_to_dict(user: dict) -> dict:
+    user["id"] = str(user.pop("_id"))
+    user.pop("password_hash", None)
+    return user
+
+async def get_current_user(request: Request) -> dict:
+    token = request.cookies.get("access_token")
+    if not token:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            raise HTTPException(401, "Invalid token type")
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(401, "User not found")
+        return user_to_dict(user)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+
+async def require_admin(request: Request) -> dict:
+    user = await get_current_user(request)
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    return user
+
+
+# ─── Pydantic Models ────────────────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class PlanCreate(BaseModel):
+    name: str
+    points: int
+    price: float
+    features: list[str] = []
+    is_active: bool = True
+
+class UpdateUserPlan(BaseModel):
+    plan_id: str
+    points: int
+
+
+# ─── Auth Routes ─────────────────────────────────────────────────────────────
+
+@api_router.post("/auth/register")
+async def register(body: RegisterRequest, response: Response):
+    email = body.email.lower().strip()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(400, "Email already registered")
+    if len(body.password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
+
+    # Default free plan
+    free_plan = await db.plans.find_one({"name": "Free"}) or {}
+    user_doc = {
+        "name": body.name,
+        "email": email,
+        "password_hash": hash_password(body.password),
+        "role": "user",
+        "plan_id": str(free_plan.get("_id", "")),
+        "plan_name": free_plan.get("name", "Free"),
+        "points": free_plan.get("points", 5),
+        "created_at": datetime.now(timezone.utc),
+    }
+    result = await db.users.insert_one(user_doc)
+    user_doc["_id"] = result.inserted_id
+
+    access_token = create_access_token(str(result.inserted_id), email)
+    refresh_token = create_refresh_token(str(result.inserted_id))
+    set_auth_cookies(response, access_token, refresh_token)
+
+    return user_to_dict(user_doc)
+
+
+@api_router.post("/auth/login")
+async def login(body: LoginRequest, request: Request, response: Response):
+    email = body.email.lower().strip()
+    ip = request.client.host if request.client else "unknown"
+    identifier = f"{ip}:{email}"
+
+    # Brute force check
+    attempts_doc = await db.login_attempts.find_one({"identifier": identifier})
+    if attempts_doc and attempts_doc.get("count", 0) >= 5:
+        lockout_until = attempts_doc.get("lockout_until")
+        if lockout_until and datetime.now(timezone.utc) < lockout_until:
+            raise HTTPException(429, "Too many attempts. Try again in 15 minutes.")
+        else:
+            await db.login_attempts.delete_one({"identifier": identifier})
+
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(body.password, user["password_hash"]):
+        await db.login_attempts.update_one(
+            {"identifier": identifier},
+            {"$inc": {"count": 1}, "$set": {"lockout_until": datetime.now(timezone.utc) + timedelta(minutes=15)}},
+            upsert=True
+        )
+        raise HTTPException(401, "Invalid email or password")
+
+    await db.login_attempts.delete_one({"identifier": identifier})
+    access_token = create_access_token(str(user["_id"]), email)
+    refresh_token = create_refresh_token(str(user["_id"]))
+    set_auth_cookies(response, access_token, refresh_token)
+    return user_to_dict(user)
+
+
+@api_router.post("/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+    return {"message": "Logged out"}
+
+
+@api_router.get("/auth/me")
+async def me(request: Request):
+    return await get_current_user(request)
+
+
+@api_router.post("/auth/refresh")
+async def refresh_token(request: Request, response: Response):
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(401, "No refresh token")
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(401, "Invalid token type")
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(401, "User not found")
+        new_access = create_access_token(str(user["_id"]), user["email"])
+        response.set_cookie("access_token", new_access, httponly=True, secure=False, samesite="lax", max_age=86400, path="/")
+        return {"message": "Token refreshed"}
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid refresh token")
+
+
+# ─── User Routes ─────────────────────────────────────────────────────────────
+
+@api_router.get("/user/profile")
+async def get_profile(request: Request):
+    return await get_current_user(request)
+
+
+# ─── Plans Routes ────────────────────────────────────────────────────────────
+
+@api_router.get("/plans")
+async def get_plans():
+    plans = await db.plans.find({"is_active": True}).to_list(100)
+    for p in plans:
+        p["id"] = str(p.pop("_id"))
+    return plans
+
+
+# ─── Admin Routes ────────────────────────────────────────────────────────────
+
+@api_router.get("/admin/users")
+async def admin_get_users(request: Request):
+    await require_admin(request)
+    users = await db.users.find({}, {"password_hash": 0}).to_list(500)
+    for u in users:
+        u["id"] = str(u.pop("_id"))
+    return users
+
+
+@api_router.put("/admin/users/{user_id}/plan")
+async def admin_update_user_plan(user_id: str, body: UpdateUserPlan, request: Request):
+    await require_admin(request)
+    plan = await db.plans.find_one({"_id": ObjectId(body.plan_id)})
+    if not plan:
+        raise HTTPException(404, "Plan not found")
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"plan_id": body.plan_id, "plan_name": plan["name"], "points": body.points}}
+    )
+    return {"message": "User plan updated"}
+
+
+@api_router.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, request: Request):
+    await require_admin(request)
+    result = await db.users.delete_one({"_id": ObjectId(user_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "User not found")
+    return {"message": "User deleted"}
+
+
+@api_router.get("/admin/stats")
+async def admin_stats(request: Request):
+    await require_admin(request)
+    total_users = await db.users.count_documents({"role": "user"})
+    total_plans = await db.plans.count_documents({"is_active": True})
+    return {"total_users": total_users, "total_plans": total_plans}
+
+
+@api_router.post("/admin/plans")
+async def admin_create_plan(body: PlanCreate, request: Request):
+    await require_admin(request)
+    doc = body.model_dump()
+    doc["created_at"] = datetime.now(timezone.utc)
+    result = await db.plans.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.delete("/admin/plans/{plan_id}")
+async def admin_delete_plan(plan_id: str, request: Request):
+    await require_admin(request)
+    result = await db.plans.delete_one({"_id": ObjectId(plan_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Plan not found")
+    return {"message": "Plan deleted"}
+
+
+# ─── Startup ──────────────────────────────────────────────────────────────────
+
+@app.on_event("startup")
+async def startup():
+    # Indexes
+    await db.users.create_index("email", unique=True)
+    await db.login_attempts.create_index("identifier")
+
+    # Seed default plans
+    if await db.plans.count_documents({}) == 0:
+        plans = [
+            {"name": "Free", "points": 5, "price": 0.0, "features": ["5 نقاط مجانية", "وصول أساسي"], "is_active": True},
+            {"name": "Pro", "points": 100, "price": 29.0, "features": ["100 نقطة شهرياً", "جميع الخدمات", "دعم متميز"], "is_active": True},
+            {"name": "Enterprise", "points": 500, "price": 99.0, "features": ["500 نقطة شهرياً", "جميع الخدمات", "API مخصص", "دعم 24/7"], "is_active": True},
+        ]
+        await db.plans.insert_many(plans)
+        logger.info("Default plans seeded")
+
+    # Seed admin
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@cvsira.com")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@2025")
+    existing = await db.users.find_one({"email": admin_email})
+    if existing is None:
+        await db.users.insert_one({
+            "name": "Admin",
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+            "role": "admin",
+            "plan_name": "Admin",
+            "points": 9999,
+            "created_at": datetime.now(timezone.utc),
+        })
+        logger.info(f"Admin seeded: {admin_email}")
+    elif not verify_password(admin_password, existing.get("password_hash", "")):
+        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+
+    # Write test credentials
+    creds_path = Path("/app/memory/test_credentials.md")
+    creds_path.parent.mkdir(parents=True, exist_ok=True)
+    creds_path.write_text(f"""# CvSira Test Credentials
+
+## Admin Account
+- Email: {admin_email}
+- Password: {admin_password}
+- Role: admin
+
+## Test User (create manually via /signup)
+- Email: test@cvsira.com
+- Password: Test@2025
+- Role: user
+
+## Auth Endpoints
+- POST /api/auth/register
+- POST /api/auth/login
+- POST /api/auth/logout
+- GET  /api/auth/me
+- POST /api/auth/refresh
+
+## Admin Endpoints
+- GET  /api/admin/users
+- GET  /api/admin/stats
+- POST /api/admin/plans
+- PUT  /api/admin/users/:id/plan
+- DELETE /api/admin/users/:id
+""")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    client.close()
+
+
+# Include router
 app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000")],
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()

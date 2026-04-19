@@ -19,7 +19,7 @@ export default function SignUpPage() {
     if (form.password.length < 8) { setError("كلمة المرور يجب أن تكون 8 أحرف على الأقل"); return }
     try {
       await register(form.name, form.email, form.password)
-      router.push("/dashboard")
+      router.push("/login")
     } catch (err: any) {
       setError(err.message)
     }

@@ -3,6 +3,7 @@
 import { useState, useRef } from "react"
 import { motion } from "framer-motion"
 import { Menu, X } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 const navItems = [
@@ -61,12 +62,16 @@ export function Navbar() {
 
         {/* CTA Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white hover:bg-zinc-800">
-            Sign In
-          </Button>
-          <Button size="sm" className="shimmer-btn bg-white text-zinc-950 hover:bg-zinc-200 rounded-full px-4">
-            Get Started
-          </Button>
+          <Link href="/signup">
+            <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white hover:bg-zinc-800">
+              Sign In
+            </Button>
+          </Link>
+          <Link href="/signup">
+            <Button size="sm" className="shimmer-btn bg-white text-zinc-950 hover:bg-zinc-200 rounded-full px-4">
+              Get Started
+            </Button>
+          </Link>
         </div>
 
         {/* Mobile Menu Button */}
@@ -99,10 +104,14 @@ export function Navbar() {
               </a>
             ))}
             <hr className="border-zinc-800 my-2" />
-            <Button variant="ghost" className="justify-start text-zinc-400 hover:text-white">
-              Sign In
-            </Button>
-            <Button className="shimmer-btn bg-white text-zinc-950 hover:bg-zinc-200 rounded-full">Get Started</Button>
+            <Link href="/signup">
+              <Button variant="ghost" className="justify-start text-zinc-400 hover:text-white">
+                Sign In
+              </Button>
+            </Link>
+            <Link href="/signup">
+              <Button className="shimmer-btn bg-white text-zinc-950 hover:bg-zinc-200 rounded-full">Get Started</Button>
+            </Link>
           </div>
         </motion.div>
       )}

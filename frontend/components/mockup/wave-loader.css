@@ -1,0 +1,38 @@
+@keyframes orbit {
+  to { transform: rotate(360deg); }
+}
+@keyframes orbit-reverse {
+  to { transform: rotate(-360deg); }
+}
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+@keyframes scan-line {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+@keyframes wave-shift {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
+@keyframes float-dot {
+  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+  50% { transform: translate(6px, -6px); opacity: 1; }
+}
+@keyframes corner-ping {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+@keyframes waveform-travel {
+  to { stroke-dashoffset: -600; }
+}
+@keyframes wave-bar {
+  0%, 100% { scaleY: 0.15; opacity: 0.3; }
+  50% { scaleY: 1; opacity: 0.85; }
+}
+@keyframes status-cycle {
+  0%, 16% { opacity: 0; transform: translateY(8px); }
+  20%, 80% { opacity: 1; transform: translateY(0); }
+  84%, 100% { opacity: 0; transform: translateY(-8px); }
+}

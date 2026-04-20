@@ -1,8 +1,8 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
-
-const API = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || ""
+import { supabase } from "@/lib/supabase"
+import type { User as SupabaseUser, Session } from "@supabase/supabase-js"
 
 interface User {
   id: string
@@ -23,55 +23,47 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-const MOCK_USERS_KEY = "cvsira_mock_users"
+async function upsertProfile(supabaseUser: SupabaseUser): Promise<User> {
+  const meta = supabaseUser.user_metadata || {}
 
-interface MockUser {
-  id: string
-  name: string
-  email: string
-  password: string
-  role: "user" | "admin"
-  plan_name: string
-  points: number
-}
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", supabaseUser.id)
+    .single()
 
-function getMockUsers(): MockUser[] {
-  if (typeof window === "undefined") return []
-  try {
-    return JSON.parse(localStorage.getItem(MOCK_USERS_KEY) || "[]")
-  } catch {
-    return []
+  if (existing) {
+    return {
+      id: existing.id,
+      name: existing.name || meta.name || "",
+      email: supabaseUser.email || "",
+      role: existing.role || "user",
+      plan_name: existing.plan_name || "Free",
+      points: existing.points ?? 5,
+    }
+  }
+
+  const newProfile = {
+    id: supabaseUser.id,
+    name: meta.name || "",
+    email: supabaseUser.email || "",
+    role: "user" as const,
+    plan_name: "Free",
+    points: 5,
+  }
+
+  const { error } = await supabase.from("profiles").insert(newProfile)
+  if (error) console.error("Profile insert error:", error.message)
+
+  return {
+    ...newProfile,
+    email: supabaseUser.email || "",
   }
 }
 
-function saveMockUser(user: MockUser) {
-  const users = getMockUsers()
-  users.push(user)
-  localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users))
-}
-
-function findMockUser(email: string): MockUser | undefined {
-  return getMockUsers().find((u) => u.email === email)
-}
-
-const CURRENT_USER_KEY = "cvsira_current_user"
-
-function saveCurrentUser(user: User | null) {
-  if (typeof window === "undefined") return
-  if (user) {
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user))
-  } else {
-    localStorage.removeItem(CURRENT_USER_KEY)
-  }
-}
-
-function loadCurrentUser(): User | null {
-  if (typeof window === "undefined") return null
-  try {
-    return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || "null")
-  } catch {
-    return null
-  }
+async function buildUserFromSession(session: Session | null): Promise<User | null> {
+  if (!session?.user) return null
+  return upsertProfile(session.user)
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -79,49 +71,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (API) {
-      fetch(`${API}/api/auth/me`, { credentials: "include" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => setUser(data || null))
-        .catch(() => {
-          const saved = loadCurrentUser()
-          setUser(saved)
-        })
-    } else {
-      const saved = loadCurrentUser()
-      setUser(saved)
-    }
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const u = await buildUserFromSession(session)
+      setUser(u)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        const u = await buildUserFromSession(session)
+        setUser(u)
+      }
+    )
+
+    return () => subscription.unsubscribe()
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
     setLoading(true)
     try {
-      if (API) {
-        const res = await fetch(`${API}/api/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ email, password }),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(formatError(data.detail))
-        setUser(data)
-        saveCurrentUser(data)
-      } else {
-        const mockUser = findMockUser(email)
-        if (!mockUser) throw new Error("البريد الإلكتروني أو كلمة المرور غير صحيحة")
-        if (mockUser.password !== password) throw new Error("البريد الإلكتروني أو كلمة المرور غير صحيحة")
-        const u: User = {
-          id: mockUser.id,
-          name: mockUser.name,
-          email: mockUser.email,
-          role: mockUser.role,
-          plan_name: mockUser.plan_name,
-          points: mockUser.points,
-        }
-        setUser(u)
-        saveCurrentUser(u)
-      }
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw new Error(mapAuthError(error.message))
+      const u = await buildUserFromSession(data.session)
+      setUser(u)
     } finally {
       setLoading(false)
     }
@@ -130,56 +101,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (name: string, email: string, password: string) => {
     setLoading(true)
     try {
-      if (API) {
-        const res = await fetch(`${API}/api/auth/register`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ name, email, password }),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(formatError(data.detail))
-        setUser(data)
-        saveCurrentUser(data)
-      } else {
-        if (findMockUser(email)) {
-          throw new Error("هذا البريد الإلكتروني مستخدم بالفعل")
-        }
-        const mockUser: MockUser = {
-          id: crypto.randomUUID(),
-          name,
-          email,
-          password,
-          role: "user",
-          plan_name: "Free",
-          points: 5,
-        }
-        saveMockUser(mockUser)
-        const u: User = {
-          id: mockUser.id,
-          name: mockUser.name,
-          email: mockUser.email,
-          role: mockUser.role,
-          plan_name: mockUser.plan_name,
-          points: mockUser.points,
-        }
-        setUser(u)
-        saveCurrentUser(u)
-      }
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      })
+      if (error) throw new Error(mapAuthError(error.message))
+      const u = await buildUserFromSession(data.session)
+      setUser(u)
     } finally {
       setLoading(false)
     }
   }, [])
 
   const logout = useCallback(async () => {
-    if (API) {
-      await fetch(`${API}/api/auth/logout`, { method: "POST", credentials: "include" })
-    }
+    await supabase.auth.signOut()
     setUser(null)
-    saveCurrentUser(null)
   }, [])
 
-  return <AuthContext.Provider value={{ user, login, register, logout, loading }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
@@ -188,9 +132,12 @@ export function useAuth() {
   return ctx
 }
 
-function formatError(detail: unknown): string {
-  if (!detail) return "حدث خطأ ما"
-  if (typeof detail === "string") return detail
-  if (Array.isArray(detail)) return detail.map((e: any) => e?.msg || JSON.stringify(e)).join(" ")
-  return String(detail)
+function mapAuthError(msg: string): string {
+  const map: Record<string, string> = {
+    "Invalid login credentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+    "User already registered": "هذا البريد الإلكتروني مستخدم بالفعل",
+    "Email not confirmed": "يرجى تأكيد بريدك الإلكتروني أولاً",
+    "Password should be at least 6 characters": "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+  }
+  return map[msg] || msg
 }

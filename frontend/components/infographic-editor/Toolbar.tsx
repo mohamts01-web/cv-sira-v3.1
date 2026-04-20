@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Undo2, Redo2, Download, FileJson, Trash2, ZoomIn, ZoomOut, Maximize, MousePointer2, Hand } from 'lucide-react'
+import { Undo2, Redo2, Download, FileJson, Trash2, ZoomIn, ZoomOut, Maximize, MousePointer2, Hand, Save, Loader2 } from 'lucide-react'
+import { useSaveProject } from '@/hooks/use-save-project'
 
 interface ToolbarProps {
   canUndo: boolean
@@ -17,6 +18,8 @@ interface ToolbarProps {
   onZoomIn: () => void
   onZoomOut: () => void
   onFitToScreen: () => void
+  onSaveProject?: (data: Record<string, unknown>, thumbnail?: string) => void
+  isSavingProject?: boolean
 }
 
 export default function Toolbar({
@@ -33,6 +36,8 @@ export default function Toolbar({
   onZoomIn,
   onZoomOut,
   onFitToScreen,
+  onSaveProject,
+  isSavingProject,
 }: ToolbarProps) {
   const [zoomInput, setZoomInput] = useState(Math.round(zoom * 100))
 
@@ -138,6 +143,18 @@ export default function Toolbar({
           <FileJson className="w-3.5 h-3.5" />
           <span>JSON</span>
         </button>
+
+        {onSaveProject && (
+          <button
+            onClick={() => onSaveProject({})}
+            disabled={isSavingProject}
+            className={buttonClasses(isSavingProject)}
+            title="Save project"
+          >
+            {isSavingProject ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            <span>حفظ</span>
+          </button>
+        )}
 
         {/* Divider */}
         <div className="h-5 w-px bg-[var(--border)] mx-1" />

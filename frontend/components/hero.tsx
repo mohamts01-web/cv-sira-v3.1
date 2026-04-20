@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 const avatars = [
@@ -87,15 +86,13 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.6 }}
           className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
         >
-          <Link href="/signup">
-            <Button
-              size="lg"
-              className="shimmer-btn bg-white text-zinc-950 hover:bg-zinc-200 rounded-full px-8 h-12 text-base font-medium shadow-lg shadow-white/10"
-            >
-              Start Building
-              <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
-          </Link>
+          <Button
+            size="lg"
+            className="shimmer-btn bg-white text-zinc-950 hover:bg-zinc-200 rounded-full px-8 h-12 text-base font-medium shadow-lg shadow-white/10"
+          >
+            Start Building
+            <ArrowRight className="ml-2 w-4 h-4" />
+          </Button>
           <Button
             variant="outline"
             size="lg"

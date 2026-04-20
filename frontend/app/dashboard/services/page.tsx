@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Sparkles, Clock, Lock } from "lucide-react"
+import { Sparkles, Clock, Lock, Image, PenTool, CreditCard, Award, Terminal } from "lucide-react"
 
 const services = [
   {
@@ -14,6 +14,17 @@ const services = [
     badge: "جديد",
   },
   {
+    id: "svg-generator",
+    title: "مولّد SVG بالذكاء الاصطناعي",
+    description: "صِف رسمك واحصل على SVG قابل للتعديل والتحميل — ثابت أو متحرك مع تحسين تلقائي",
+    icon: PenTool,
+    color: "from-cyan-500 to-blue-600",
+    cost: "3 نقاط / رسم",
+    href: "/dashboard/services/svg-generator",
+    status: "active",
+    badge: "AI",
+  },
+  {
     id: "infographic-editor",
     title: "محرر الإنفوجرافيك AI",
     description: "محرر كامل لتصميم الإنفوجرافيك بالذكاء الاصطناعي مع Fabric.js - تحرير، طبقات، تصدير",
@@ -23,6 +34,50 @@ const services = [
     href: "/dashboard/services/infographic-editor",
     status: "active",
     badge: "AI",
+  },
+  {
+    id: "mockup-generator",
+    title: "مولّد نماذج المنتجات",
+    description: "صِف منتجك واحصل على نموذج UI/UX احترافي بالذكاء الاصطناعي مع دعم الصور المرجعية",
+    icon: Image,
+    color: "from-fuchsia-500 to-pink-600",
+    cost: "3 نقاط / نموذج",
+    href: "/dashboard/services/mockup-generator",
+    status: "active",
+    badge: "جديد",
+  },
+  {
+    id: "card-generator",
+    title: "مولّد البطاقات AI",
+    description: "أنشئ بطاقات وبورتريهات احترافية بالذكاء الاصطناعي — تحكم بالأسلوب والإضاءة والوضعية",
+    icon: CreditCard,
+    color: "from-amber-500 to-orange-600",
+    cost: "2 نقاط / بطاقة",
+    href: "/dashboard/services/card-generator",
+    status: "active",
+    badge: "جديد",
+  },
+  {
+    id: "badge-generator",
+    title: "مولّد شارات البكسل آرت",
+    description: "حوّل صورك إلى شارات بكسل آرت للفعاليات والمؤتمرات مع إزالة خلفية تلقائية وتخصيص كامل",
+    icon: Award,
+    color: "from-lime-500 to-green-600",
+    cost: "3 نقاط / شارة",
+    href: "/dashboard/services/badge-generator",
+    status: "active",
+    badge: "جديد",
+  },
+  {
+    id: "ascii-converter",
+    title: "محول الصور إلى ASCII Art",
+    description: "حوّل أي صورة إلى فن نصي ASCII مع تحكم بالدقة والأحرف والألوان — يعمل محلياً بدون API",
+    icon: Terminal,
+    color: "from-emerald-500 to-teal-600",
+    cost: "مجاني",
+    href: "/dashboard/services/ascii-converter",
+    status: "active",
+    badge: "مجاني",
   },
   {
     id: "cv",

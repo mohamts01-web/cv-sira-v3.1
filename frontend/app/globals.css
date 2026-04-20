@@ -75,9 +75,10 @@
 }
 
 @theme inline {
-  --font-sans: "Manrope", "Manrope Fallback", sans-serif;
+  --font-sans: "IBM Plex Sans Arabic", "Manrope", "Manrope Fallback", sans-serif;
   --font-display: "Cal Sans", "Cal Sans Fallback", sans-serif;
   --font-heading: "Instrument Sans", "Instrument Sans Fallback", sans-serif;
+  --font-arabic: "IBM Plex Sans Arabic", "IBM Plex Sans Arabic Fallback", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -232,4 +233,50 @@
   stroke-dasharray: 1000;
   stroke-dashoffset: 1000;
   animation: draw-line 2s ease-out forwards;
+}
+
+/* ========================================
+   RTL Support — inspired by RTL Free
+   ======================================== */
+
+html[dir="rtl"] body {
+  font-family: var(--font-arabic), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html[dir="rtl"] input,
+html[dir="rtl"] textarea,
+html[dir="rtl"] [contenteditable] {
+  unicode-bidi: plaintext;
+}
+
+html[dir="rtl"] code,
+html[dir="rtl"] pre,
+html[dir="rtl"] kbd,
+html[dir="rtl"] samp,
+html[dir="rtl"] tt,
+html[dir="rtl"] var {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: embed;
+  font-family: "SF Mono", "Monaco", "Menlo", "Consolas", "Courier New", monospace;
+}
+
+html[dir="rtl"] ul,
+html[dir="rtl"] ol {
+  padding-inline-start: 1.5em;
+}
+
+html[dir="rtl"] .animate-marquee {
+  animation: marquee-reverse 30s linear infinite;
+}
+
+@keyframes marquee-reverse {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(50%);
+  }
 }

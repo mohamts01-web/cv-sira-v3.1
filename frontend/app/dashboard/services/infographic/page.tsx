@@ -5,8 +5,9 @@ import { useAuth } from "@/lib/auth-context"
 import {
   Download, Maximize2, X, ImageIcon, Loader2,
   ChevronDown, ArrowUp, Coins, Sparkles, History,
-  AlertCircle, Info
+  AlertCircle, Info, Save
 } from "lucide-react"
+import { useSaveProject } from "@/hooks/use-save-project"
 
 const API = process.env.NEXT_PUBLIC_BACKEND_URL || ""
 
@@ -25,6 +26,7 @@ const POINTS_PER_IMAGE = 2
 
 export default function InfographicService() {
   const { user } = useAuth()
+  const { save: saveProject, isSaving: isSavingProject } = useSaveProject("infographic")
   const [prompt, setPrompt] = useState("")
   const [imageSize, setImageSize] = useState("landscape_16_9")
   const [numImages, setNumImages] = useState(1)
@@ -254,6 +256,10 @@ export default function InfographicService() {
                     className="w-10 h-10 rounded-full bg-white/95 flex items-center justify-center shadow-md hover:scale-105 transition-transform">
                     <Download className="w-4 h-4 text-black" />
                   </button>
+                  <button onClick={() => saveProject({ title: prompt.slice(0, 40), data: { prompt, imageSize, url: img.url }, thumbnail: img.url })} disabled={isSavingProject}
+                    className="w-10 h-10 rounded-full bg-white/95 flex items-center justify-center shadow-md hover:scale-105 transition-transform disabled:opacity-50">
+                    {isSavingProject ? <Loader2 className="w-4 h-4 text-black animate-spin" /> : <Save className="w-4 h-4 text-black" />}
+                  </button>
                 </div>
                 {images.length > 1 && (
                   <div className="absolute top-3 left-3 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full backdrop-blur-sm">
@@ -265,11 +271,19 @@ export default function InfographicService() {
           </div>
 
           {images.length > 1 && (
-            <div className="mt-4 flex justify-center">
+            <div className="mt-4 flex justify-center gap-2">
               <button onClick={() => images.forEach((img, i) => handleDownload(img.url, i))}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl border border-gray-200 dark:border-zinc-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all">
                 <Download className="w-4 h-4" />
                 تنزيل الكل
+              </button>
+              <button
+                onClick={() => saveProject({ title: prompt.slice(0, 40), data: { prompt, imageSize, numImages, images: images.map(i => i.url) }, thumbnail: images[0]?.url })}
+                disabled={isSavingProject}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl border border-emerald-200 dark:border-emerald-500/30 text-sm text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all disabled:opacity-50"
+              >
+                {isSavingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                حفظ المشروع
               </button>
             </div>
           )}

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import * as fabric from "fabric"
 import dynamic from "next/dynamic"
+import { useSaveProject } from "@/hooks/use-save-project"
 import { useCanvasHistory } from "@/hooks/use-canvas-history"
 import { useCanvasSelection } from "@/hooks/use-canvas-selection"
 import {
@@ -31,6 +32,7 @@ const InfographicCanvas = dynamic(
 )
 
 export default function InfographicEditorPage() {
+  const { save: saveProject, isSaving: isSavingProject } = useSaveProject("infographic-editor")
   const [canvas, setCanvas] = useState<fabric.Canvas | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [zoomOverride, setZoomOverride] = useState<number | null>(null)
@@ -235,6 +237,12 @@ export default function InfographicEditorPage() {
         onExportJSON={() => canvasRef.current?.exportJSON()}
         onClearAll={() => { canvasRef.current?.clearAll(); pushState(); setRefreshTrigger((t) => t + 1) }}
         onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} onFitToScreen={handleFitToScreen}
+        onSaveProject={async (data) => {
+          const json = canvas?.toJSON()
+          const thumb = canvas?.toDataURL({ format: "png", quality: 0.3, multiplier: 0.25 })
+          await saveProject({ title: "محرر إنفوجرافيك", data: { ...data, canvas: json, canvasSize }, thumbnail: thumb })
+        }}
+        isSavingProject={isSavingProject}
       />
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="w-[260px] flex-shrink-0 flex flex-col border-r border-zinc-800 overflow-hidden" style={{ background: "var(--bg-panel, #141414)" }}>

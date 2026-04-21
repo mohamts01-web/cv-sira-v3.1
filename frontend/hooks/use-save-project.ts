@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { saveProject, updateProject, type ServiceType, type Project } from "@/lib/projects"
+import { saveProject, type ServiceType, type Project } from "@/lib/projects"
 
 export function useSaveProject(serviceType: ServiceType) {
   const [isSaving, setIsSaving] = useState(false)
@@ -11,27 +11,19 @@ export function useSaveProject(serviceType: ServiceType) {
   const save = useCallback(async (params: {
     title?: string
     data: Record<string, unknown>
-    thumbnail?: string
+    thumbnail?: string | null
     projectId?: string
   }) => {
     setIsSaving(true)
     setError(null)
     try {
-      let project: Project
-      if (params.projectId) {
-        project = await updateProject(params.projectId, {
-          data: params.data,
-          title: params.title,
-          thumbnail: params.thumbnail,
-        })
-      } else {
-        project = await saveProject({
-          serviceType,
-          title: params.title,
-          data: params.data,
-          thumbnail: params.thumbnail,
-        })
-      }
+      const project = await saveProject({
+        serviceType,
+        title: params.title,
+        data: params.data,
+        thumbnail: params.thumbnail,
+        projectId: params.projectId,
+      })
       setLastSaved(project)
       return project
     } catch (err) {

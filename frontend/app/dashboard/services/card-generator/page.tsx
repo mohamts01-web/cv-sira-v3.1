@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
-import { Sparkles, Download, AlertCircle, Loader2, RotateCcw, MessageCircle, Palette, Sun, User, Monitor, ImageIcon, ChevronDown, Upload, X, Save } from "lucide-react"
+import { Sparkles, Download, AlertCircle, Loader2, RotateCcw, MessageCircle, Palette, Sun, User, Monitor, ImageIcon, ChevronDown, Upload, X, Save, Folder } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/lib/auth-context"
 import { useSaveProject } from "@/hooks/use-save-project"
@@ -161,18 +162,30 @@ export default function CardGeneratorPage() {
 
   return (
     <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/20">
-          <ImageIcon className="h-5 w-5 text-fuchsia-500" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/20">
+            <ImageIcon className="h-5 w-5 text-fuchsia-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white font-sans">
+              مولّد البطاقات بالذكاء الاصطناعي
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-sans">
+              أنشئ صوراً شخصية احترافية بالذكاء الاصطناعي
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white font-sans">
-            مولّد البطاقات بالذكاء الاصطناعي
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 font-sans">
-            أنشئ صوراً شخصية احترافية بالذكاء الاصطناعي
-          </p>
-        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.location.href = "/dashboard/projects"}
+          className="flex items-center gap-2 border-gray-200 dark:border-[#1F1F23]"
+        >
+          <Folder className="h-4 w-4" />
+          <span>مشاريعي</span>
+        </Button>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">

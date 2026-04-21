@@ -2,7 +2,7 @@
 
 import type React from "react"
 import Image from "next/image"
-import { useState, useTransition, useRef, useEffect, useMemo } from "react"
+import { useState, useTransition, useRef, useEffect, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Sparkles,
@@ -19,12 +19,14 @@ import {
   ChevronDown,
   Save,
   Loader2,
+  Folder,
 } from "lucide-react"
 import { BadgePreview } from "@/components/badge/badge-preview"
 import { toPng } from "html-to-image"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { convertImageToPixelArt, DEFAULT_PIXEL_OPTIONS, PALETTE_PRESETS } from "@/lib/image-to-pixelart"
 import { useSaveProject } from "@/hooks/use-save-project"
+import { useAutoSave } from "@/hooks/use-auto-save"
 
 type GenerationMetadata = {
   requestId: string
@@ -33,7 +35,7 @@ type GenerationMetadata = {
 }
 
 export default function BadgeStudioPage() {
-  const { save: saveProject, isSaving: isSavingProject } = useSaveProject("badge-generator")
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
   const [eventName, setEventName] = useState("CVSIRA")
   const [eventDate, setEventDate] = useState("2025")
   const [badgeNumber, setBadgeNumber] = useState("0001")
@@ -99,6 +101,31 @@ export default function BadgeStudioPage() {
   const [galleryItems, setGalleryItems] = useState<GenerationMetadata[]>([])
   const [showGalleryModal, setShowGalleryModal] = useState(false)
   const [showPlaceholder, setShowPlaceholder] = useState(true)
+
+  // Auto-save functionality
+  const badgeData = useMemo(() => ({
+    eventName, eventDate, badgeNumber, backgroundColor, backgroundImage,
+    imageFilter, imageScale, imagePositionX, imagePositionY,
+    isInvert, logoText, matrixEnabled, matrixHue, matrixSpeed,
+    matrixDepth, matrixChars, matrixScale, matrixPositionX, matrixPositionY,
+    pixelGridSize, pixelBrightness, pixelContrast, pixelRemoveBg,
+    pixelBgThreshold, pixelAlphaThreshold, pixelEdgeSoftness, pixelPalette,
+  }), [
+    eventName, eventDate, badgeNumber, backgroundColor, backgroundImage,
+    imageFilter, imageScale, imagePositionX, imagePositionY,
+    isInvert, logoText, matrixEnabled, matrixHue, matrixSpeed,
+    matrixDepth, matrixChars, matrixScale, matrixPositionX, matrixPositionY,
+    pixelGridSize, pixelBrightness, pixelContrast, pixelRemoveBg,
+    pixelBgThreshold, pixelAlphaThreshold, pixelEdgeSoftness, pixelPalette,
+  ])
+
+  const { isSaving: isSavingProject, lastSaved, manualSave } = useAutoSave({
+    serviceType: "badge-generator",
+    data: badgeData,
+    thumbnail: resultUrl,
+    enabled: autoSaveEnabled,
+    delay: 3000, // Auto-save after 3 seconds of inactivity
+  })
 
   const openCamera = async () => {
     try {
@@ -503,11 +530,10 @@ export default function BadgeStudioPage() {
                       key={f.key}
                       type="button"
                       onClick={() => setImageFilter(f.key)}
-                      className={`group relative overflow-hidden rounded-lg border px-2 py-1.5 text-left font-mono text-xs transition-all ${
-                        imageFilter === f.key
-                          ? "border-white/40 bg-white/10 text-white"
-                          : "border-white/10 bg-white/5 text-white/70 hover:border-white/20 hover:bg-white/10 hover:text-white"
-                      }`}
+                      className={`group relative overflow-hidden rounded-lg border px-2 py-1.5 text-left font-mono text-xs transition-all ${imageFilter === f.key
+                        ? "border-white/40 bg-white/10 text-white"
+                        : "border-white/10 bg-white/5 text-white/70 hover:border-white/20 hover:bg-white/10 hover:text-white"
+                        }`}
                     >
                       <div className="flex items-center gap-2">
                         <div className={`h-3.5 w-3.5 rounded border border-white/20 bg-gradient-to-br ${f.gradient}`} />
@@ -652,11 +678,10 @@ export default function BadgeStudioPage() {
                       key={key}
                       type="button"
                       onClick={() => setPixelPalette(key)}
-                      className={`px-1 py-1.5 text-[10px] font-mono border rounded transition-colors ${
-                        pixelPalette === key
-                          ? "border-white/40 bg-white/10 text-white"
-                          : "border-white/10 text-white/50 hover:border-white/20 hover:text-white/70"
-                      }`}
+                      className={`px-1 py-1.5 text-[10px] font-mono border rounded transition-colors ${pixelPalette === key
+                        ? "border-white/40 bg-white/10 text-white"
+                        : "border-white/10 text-white/50 hover:border-white/20 hover:text-white/70"
+                        }`}
                     >
                       {label}
                     </button>
@@ -809,11 +834,10 @@ export default function BadgeStudioPage() {
                           key={key}
                           type="button"
                           onClick={() => handleCharSetChange(key)}
-                          className={`px-1 py-1.5 text-[10px] font-mono border rounded transition-colors ${
-                            matrixCharSet === key
-                              ? "border-green-500 bg-green-500/10 text-green-400"
-                              : "border-white/10 text-white/50 hover:border-white/20 hover:text-white/70"
-                          }`}
+                          className={`px-1 py-1.5 text-[10px] font-mono border rounded transition-colors ${matrixCharSet === key
+                            ? "border-green-500 bg-green-500/10 text-green-400"
+                            : "border-white/10 text-white/50 hover:border-white/20 hover:text-white/70"
+                            }`}
                         >
                           {label}
                         </button>
@@ -983,6 +1007,14 @@ export default function BadgeStudioPage() {
                 <input ref={uploadInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
 
                 <button
+                  onClick={() => window.location.href = "/dashboard/projects"}
+                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white transition-colors hover:bg-white/10"
+                >
+                  <Folder className="h-4 w-4" />
+                  <span>مشاريعي</span>
+                </button>
+
+                <button
                   onClick={openCamera}
                   className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white transition-colors hover:bg-white/10"
                 >
@@ -1008,20 +1040,23 @@ export default function BadgeStudioPage() {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Auto-save toggle */}
+                <button
+                  onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${autoSaveEnabled
+                    ? "border-green-500/40 bg-green-500/10 text-green-400"
+                    : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                    }`}
+                  title={autoSaveEnabled ? "الحفظ التلقائي مفعّل" : "الحفظ التلقائي معطّل"}
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  <span>حفظ تلقائي</span>
+                </button>
+
                 <button
                   onClick={() => {
                     if (!resultUrl) return
-                    saveProject({
-                      title: `${eventName} - ${badgeNumber}`,
-                      data: {
-                        eventName, eventDate, badgeNumber, backgroundColor,
-                        imageFilter, imageScale, imagePositionX, imagePositionY,
-                        isInvert, logoText, matrixEnabled, matrixHue, matrixSpeed,
-                        matrixDepth, matrixChars, matrixScale, matrixPositionX, matrixPositionY,
-                        pixelGridSize, pixelBrightness, pixelContrast, pixelRemoveBg, pixelPalette,
-                      },
-                      thumbnail: resultUrl,
-                    })
+                    manualSave(`${eventName} - ${badgeNumber}`)
                   }}
                   disabled={!resultUrl || isSavingProject}
                   className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-50"
@@ -1038,6 +1073,16 @@ export default function BadgeStudioPage() {
                   <span>تحميل</span>
                 </button>
               </div>
+
+              {/* Auto-save status indicator */}
+              {lastSaved && autoSaveEnabled && (
+                <div className="flex items-center gap-1.5 text-xs text-white/50">
+                  <Loader2 className={`h-3 w-3 ${isSavingProject ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isSavingProject ? 'جارٍ الحفظ...' : `تم الحفظ: ${new Date(lastSaved.updated_at).toLocaleTimeString('ar-SA')}`}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 w-full gap-2 md:hidden">
@@ -1080,15 +1125,7 @@ export default function BadgeStudioPage() {
               <button
                 onClick={() => {
                   if (!resultUrl) return
-                  saveProject({
-                    title: `${eventName} - ${badgeNumber}`,
-                    data: {
-                      eventName, eventDate, badgeNumber, backgroundColor,
-                      imageFilter, imageScale, imagePositionX, imagePositionY,
-                      isInvert, logoText,
-                    },
-                    thumbnail: resultUrl,
-                  })
+                  manualSave(`${eventName} - ${badgeNumber}`)
                 }}
                 disabled={!resultUrl || isSavingProject}
                 className="flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-50"
@@ -1096,6 +1133,16 @@ export default function BadgeStudioPage() {
                 {isSavingProject ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 <span>حفظ</span>
               </button>
+
+              {/* Auto-save status indicator (mobile) */}
+              {lastSaved && autoSaveEnabled && (
+                <div className="flex items-center justify-center gap-1.5 mt-2 text-xs text-white/50">
+                  <Loader2 className={`h-3 w-3 ${isSavingProject ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isSavingProject ? 'جارٍ الحفظ...' : `تم الحفظ: ${new Date(lastSaved.updated_at).toLocaleTimeString('ar-SA')}`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

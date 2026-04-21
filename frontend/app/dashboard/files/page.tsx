@@ -17,7 +17,7 @@ export default function FileUploadPage() {
       </div>
 
       <div className="max-w-2xl">
-        <FileUpload />
+        <FileUpload projectId="general" />
       </div>
     </div>
   )

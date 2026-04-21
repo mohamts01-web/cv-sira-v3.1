@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Sparkles, AlertCircle } from "lucide-react"
+import { Sparkles, AlertCircle, Folder } from "lucide-react"
 import { PromptForm, type ReferenceImage } from "@/components/mockup/prompt-form"
 import { MockupResult } from "@/components/mockup/mockup-result"
 import { EmptyState } from "@/components/mockup/empty-state"
@@ -63,18 +63,28 @@ export default function MockupGeneratorPage() {
 
   return (
     <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 border border-purple-500/20">
-          <Sparkles className="h-5 w-5 text-purple-500" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 border border-purple-500/20">
+            <Sparkles className="h-5 w-5 text-purple-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white font-sans">
+              مولّد نماذج المنتجات بالذكاء الاصطناعي
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-sans">
+              صِف منتجك واحصل على نموذج احترافي بثوانٍ
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white font-sans">
-            مولّد نماذج المنتجات بالذكاء الاصطناعي
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 font-sans">
-            صِف منتجك واحصل على نموذج احترافي بثوانٍ
-          </p>
-        </div>
+
+        <button
+          onClick={() => window.location.href = "/dashboard/projects"}
+          className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-[#1F1F23] bg-white dark:bg-[#141418] px-3 py-1.5 text-xs text-gray-900 dark:text-white transition-colors hover:bg-gray-50 dark:hover:bg-[#1F1F23]"
+        >
+          <Folder className="h-4 w-4" />
+          <span>مشاريعي</span>
+        </button>
       </div>
 
       <div className="flex gap-6">

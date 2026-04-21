@@ -1,0 +1,13 @@
+{
+  "name": "cv-sira-r2-test",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Test script for Cloudflare R2 Storage connection with Supabase",
+  "main": "test-r2-connection.js",
+  "scripts": {
+    "test": "node test-r2-connection.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.709.0"
+  }
+}

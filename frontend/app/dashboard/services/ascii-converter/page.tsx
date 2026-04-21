@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Upload, Download, Copy, RotateCcw, ImageIcon, Save, Loader2 } from "lucide-react"
+import { Upload, Download, Copy, RotateCcw, ImageIcon, Save, Loader2, Folder, ArrowRight } from "lucide-react"
 import { useSaveProject } from "@/hooks/use-save-project"
 
 type ColoredChar = {
@@ -338,9 +338,21 @@ export default function AsciiConverterPage() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="flex flex-col gap-2">
-        <h1 className="text-xl font-bold text-white">محول الصور إلى ASCII Art</h1>
-        <p className="text-sm text-white/60">حوّل أي صورة إلى فن نصي ASCII — ارفع صورة وابدأ فوراً</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-xl font-bold text-white">محول الصور إلى ASCII Art</h1>
+          <p className="text-sm text-white/60">حوّل أي صورة إلى فن نصي ASCII — ارفع صورة وابدأ فوراً</p>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.location.href = "/dashboard/projects"}
+          className="flex items-center gap-2 bg-white/5 border-white/10 text-white hover:bg-white/10"
+        >
+          <Folder className="h-4 w-4" />
+          <span>مشاريعي</span>
+        </Button>
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">

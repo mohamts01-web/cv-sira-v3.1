@@ -1,6 +1,7 @@
 "use client"
 
 import { SvgGenerator } from "@/components/svg-generator/svg-generator"
+import { Folder } from "lucide-react"
 
 export default function SvgGeneratorPage() {
   return (
@@ -21,6 +22,14 @@ export default function SvgGeneratorPage() {
             </p>
           </div>
         </div>
+
+        <button
+          onClick={() => window.location.href = "/dashboard/projects"}
+          className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-[#1F1F23] bg-white dark:bg-[#141418] px-3 py-1.5 text-xs text-gray-900 dark:text-white transition-colors hover:bg-gray-50 dark:hover:bg-[#1F1F23]"
+        >
+          <Folder className="h-4 w-4" />
+          <span>مشاريعي</span>
+        </button>
       </div>
 
       <SvgGenerator />

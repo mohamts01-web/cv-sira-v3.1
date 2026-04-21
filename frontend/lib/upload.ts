@@ -18,19 +18,30 @@ export interface SavedFile {
   user_id: string
   tenant_id: string
   r2_key: string
-  service_type: string | null
   file_name: string | null
+  file_size: number | null
+  public_url: string | null
+  content_type: string | null
+  project_id: string | null
+  service_type: string | null
   created_at: string
 }
 
-async function getPresignedUrl(
-  fileName: string,
-  contentType: string,
-  userId: string,
-  tenantId: string
-): Promise<{ uploadUrl: string; key: string }> {
+export interface R2ConnectionStatus {
+  connected: boolean
+  bucket?: string
+  objectCount?: number
+  latencyMs?: number
+  publicUrl?: string
+  error?: string
+}
+
+async function callEdgeFunction<T>(
+  functionName: string,
+  body: Record<string, unknown>
+): Promise<T> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const functionUrl = `${supabaseUrl}/functions/v1/generate-upload-url`
+  const functionUrl = `${supabaseUrl}/functions/v1/${functionName}`
 
   const makeRequest = async (accessToken: string): Promise<Response> => {
     const controller = new AbortController()
@@ -43,7 +54,7 @@ async function getPresignedUrl(
           "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ fileName, contentType, userId, tenantId }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       })
     } finally {
@@ -53,7 +64,7 @@ async function getPresignedUrl(
 
   let { data: { session } } = await supabase.auth.getSession()
   if (!session) {
-    throw new Error("User must be authenticated to upload files")
+    throw new Error("User must be authenticated")
   }
 
   let response = await makeRequest(session.access_token)
@@ -69,16 +80,29 @@ async function getPresignedUrl(
 
   if (!response.ok) {
     const errorBody = await response.text()
+    console.error(`[${functionName}] Edge Function error:`, response.status, errorBody)
     throw new Error(`Edge Function returned ${response.status}: ${errorBody}`)
   }
 
-  const urlData = await response.json()
+  return response.json()
+}
 
-  if (!urlData?.uploadUrl || !urlData?.key) {
-    throw new Error("Invalid response from upload URL generator: " + JSON.stringify(urlData))
+async function getPresignedUrl(
+  fileName: string,
+  contentType: string,
+  userId: string,
+  projectId: string
+): Promise<{ uploadUrl: string; key: string; publicUrl: string }> {
+  const data = await callEdgeFunction<{ uploadUrl: string; key: string; publicUrl: string }>(
+    "generate-upload-url",
+    { fileName, contentType, userId, projectId }
+  )
+
+  if (!data?.uploadUrl || !data?.key) {
+    throw new Error("Invalid response from upload URL generator: " + JSON.stringify(data))
   }
 
-  return { uploadUrl: urlData.uploadUrl, key: urlData.key }
+  return data
 }
 
 async function uploadToR2(uploadUrl: string, body: Blob | File, contentType: string): Promise<void> {
@@ -92,25 +116,34 @@ async function uploadToR2(uploadUrl: string, body: Blob | File, contentType: str
 
   if (!uploadResponse.ok) {
     const text = await uploadResponse.text().catch(() => uploadResponse.statusText)
+    console.error("[uploadToR2] R2 upload error:", uploadResponse.status, text)
     throw new Error(`Failed to upload to storage: ${text}`)
   }
 }
 
-async function saveMetadata(
-  userId: string,
-  tenantId: string,
-  r2Key: string,
-  serviceType?: string,
-  fileName?: string
-): Promise<{ id: string }> {
+async function saveMetadata(params: {
+  userId: string
+  tenantId: string
+  r2Key: string
+  fileName: string
+  fileSize: number
+  publicUrl: string
+  contentType: string
+  projectId: string
+  serviceType?: string
+}): Promise<{ id: string }> {
   const { data: fileRecord, error: dbError } = await supabase
     .from("files")
     .insert({
-      user_id: userId,
-      tenant_id: tenantId,
-      r2_key: r2Key,
-      service_type: serviceType || null,
-      file_name: fileName || null,
+      user_id: params.userId,
+      tenant_id: params.tenantId,
+      r2_key: params.r2Key,
+      file_name: params.fileName,
+      file_size: params.fileSize,
+      public_url: params.publicUrl,
+      content_type: params.contentType,
+      project_id: params.projectId,
+      service_type: params.serviceType || null,
     })
     .select("id")
     .single()
@@ -122,10 +155,22 @@ async function saveMetadata(
   return { id: fileRecord.id }
 }
 
+export async function checkR2Connection(): Promise<R2ConnectionStatus> {
+  try {
+    return await callEdgeFunction<R2ConnectionStatus>("check-r2-connection", {})
+  } catch (err) {
+    return {
+      connected: false,
+      error: err instanceof Error ? err.message : "Connection check failed",
+    }
+  }
+}
+
 export async function uploadFile(
   file: File | Blob,
   userId: string,
   tenantId: string,
+  projectId: string,
   options?: {
     serviceType?: string
     fileName?: string
@@ -142,7 +187,7 @@ export async function uploadFile(
 
   options?.onProgress?.({ stage: "generating-url", progress: 0 })
 
-  const { uploadUrl, key } = await getPresignedUrl(fileName, contentType, userId, tenantId)
+  const { uploadUrl, key, publicUrl } = await getPresignedUrl(fileName, contentType, userId, projectId)
 
   options?.onProgress?.({ stage: "uploading", progress: 30 })
 
@@ -150,17 +195,36 @@ export async function uploadFile(
 
   options?.onProgress?.({ stage: "saving-metadata", progress: 80 })
 
-  const { id } = await saveMetadata(userId, tenantId, key, options?.serviceType, fileName)
+  let savedId = ""
+
+  try {
+    const { id } = await saveMetadata({
+      userId,
+      tenantId,
+      r2Key: key,
+      fileName,
+      fileSize: blob.size,
+      publicUrl,
+      contentType,
+      projectId,
+      serviceType: options?.serviceType,
+    })
+    savedId = id
+  } catch (metadataError) {
+    try {
+      await callEdgeFunction("delete-r2-file", { key, userId })
+    } catch (cleanupError) {
+      console.error("[uploadFile] Failed to cleanup R2 object after metadata save failure:", cleanupError)
+    }
+    throw metadataError
+  }
 
   options?.onProgress?.({ stage: "saving-metadata", progress: 100 })
 
-  const accountId = "5d2aaa4d9c48ccc1ffc11fe92bb2d80f"
-  const bucket = "qalva"
-
   return {
     key,
-    id,
-    url: `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${key}`,
+    id: savedId,
+    url: publicUrl,
   }
 }
 
@@ -168,6 +232,7 @@ export async function uploadCanvas(
   canvas: HTMLCanvasElement,
   userId: string,
   tenantId: string,
+  projectId: string,
   options?: {
     serviceType?: string
     fileName?: string
@@ -191,7 +256,7 @@ export async function uploadCanvas(
     )
   })
 
-  return uploadFile(blob, userId, tenantId, {
+  return uploadFile(blob, userId, tenantId, projectId, {
     ...options,
     fileName,
     serviceType: options?.serviceType,
@@ -202,6 +267,7 @@ export async function uploadDataUrl(
   dataUrl: string,
   userId: string,
   tenantId: string,
+  projectId: string,
   options?: {
     serviceType?: string
     fileName?: string
@@ -214,7 +280,7 @@ export async function uploadDataUrl(
   const ext = mimeType.split("/")[1] || "png"
   const fileName = options?.fileName || `output-${Date.now()}.${ext}`
 
-  return uploadFile(blob, userId, tenantId, {
+  return uploadFile(blob, userId, tenantId, projectId, {
     ...options,
     fileName,
     serviceType: options?.serviceType,
@@ -222,6 +288,25 @@ export async function uploadDataUrl(
 }
 
 export async function deleteFile(fileId: string): Promise<void> {
+  const { data: fileRecord, error: fetchError } = await supabase
+    .from("files")
+    .select("r2_key, user_id")
+    .eq("id", fileId)
+    .single()
+
+  if (fetchError || !fileRecord) {
+    throw new Error(`Failed to fetch file record: ${fetchError?.message || "File not found"}`)
+  }
+
+  try {
+    await callEdgeFunction("delete-r2-file", {
+      key: fileRecord.r2_key,
+      userId: fileRecord.user_id,
+    })
+  } catch (r2Error) {
+    console.error("[deleteFile] Failed to delete from R2, proceeding with DB deletion:", r2Error)
+  }
+
   const { error: deleteError } = await supabase
     .from("files")
     .delete()
@@ -270,6 +355,26 @@ export async function getUserFiles(
 
   if (error) {
     throw new Error(`Failed to list files: ${error.message}`)
+  }
+
+  return data as SavedFile[]
+}
+
+export async function getProjectFiles(
+  userId: string,
+  tenantId: string,
+  projectId: string
+): Promise<SavedFile[]> {
+  const { data, error } = await supabase
+    .from("files")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", userId)
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    throw new Error(`Failed to list project files: ${error.message}`)
   }
 
   return data as SavedFile[]

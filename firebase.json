@@ -1,0 +1,17 @@
+{
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "CvSira",
+        "supportEmail": "mohamts01@gmail.com"
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "eur3",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

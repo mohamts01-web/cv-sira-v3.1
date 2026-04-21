@@ -87,7 +87,7 @@ export default function Sidebar() {
                 <NavItem href="/dashboard" icon={Home}>Dashboard</NavItem>
                 <NavItem href="/dashboard/files" icon={Upload}>رفع الملفات</NavItem>
                 <NavItem href="#" icon={BarChart2}>Analytics</NavItem>
-                <NavItem href="#" icon={Folder}>Projects</NavItem>
+                <NavItem href="/dashboard/projects" icon={Folder}>مشاريعي</NavItem>
               </div>
             </div>
 

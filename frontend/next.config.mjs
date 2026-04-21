@@ -6,9 +6,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    outputFileTracingRoot: "/app/frontend",
-  },
+  experimental: {},
   async headers() {
     return [
       {

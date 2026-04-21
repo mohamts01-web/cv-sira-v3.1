@@ -4,14 +4,19 @@ import React, { useCallback, useState, useRef } from "react"
 import { UploadCloud, File, X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { uploadFile, listFiles, deleteFile, SavedFile } from "@/lib/upload"
+import { uploadFile, listFiles, deleteFile, checkR2Connection, SavedFile, R2ConnectionStatus } from "@/lib/upload"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 
 type UploadStatus = "idle" | "uploading" | "success" | "error"
 
-export default function FileUpload() {
+interface FileUploadProps {
+  projectId: string
+}
+
+export default function FileUpload({ projectId }: FileUploadProps) {
   const { user } = useAuth()
+  const [r2Status, setR2Status] = useState<R2ConnectionStatus | null>(null)
   const [status, setStatus] = useState<UploadStatus>("idle")
   const [progress, setProgress] = useState(0)
   const [progressStage, setProgressStage] = useState("")
@@ -23,6 +28,11 @@ export default function FileUpload() {
   const inputRef = useRef<HTMLInputElement>(null)
 
   const tenantId = "default"
+
+  React.useEffect(() => {
+    if (!user) return
+    checkR2Connection().then(setR2Status)
+  }, [user])
 
   const loadFiles = useCallback(async () => {
     if (!user) return
@@ -78,7 +88,7 @@ export default function FileUpload() {
     setErrorMessage("")
 
     try {
-      const result = await uploadFile(selectedFile, user.id, tenantId, {
+      const result = await uploadFile(selectedFile, user.id, tenantId, projectId, {
         onProgress: (p) => {
           setProgress(p.progress)
           const stageMap: Record<string, string> = {
@@ -149,6 +159,14 @@ export default function FileUpload() {
 
   return (
     <div className="space-y-6">
+      {r2Status && !r2Status.connected && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400">
+          <AlertCircle className="w-5 h-5" />
+          <span className="text-sm font-medium">
+            خطأ في اتصال التخزين: {r2Status.error || "غير متصل"}
+          </span>
+        </div>
+      )}
       <div
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}

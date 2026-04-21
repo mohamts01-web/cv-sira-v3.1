@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context"
 import {
   Download, Maximize2, X, ImageIcon, Loader2,
   ChevronDown, ArrowUp, Coins, Sparkles, History,
-  AlertCircle, Info, Save
+  AlertCircle, Info, Save, Folder
 } from "lucide-react"
 import { useSaveProject } from "@/hooks/use-save-project"
 
@@ -90,8 +90,8 @@ export default function InfographicService() {
   return (
     <div className="min-h-full">
       {/* Page Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-1">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-purple-400" />
           </div>
@@ -100,6 +100,14 @@ export default function InfographicService() {
             <p className="text-sm text-gray-500 dark:text-gray-400">حوّل أفكارك إلى صور مذهلة بـ ByteDance SeedDream v4.5</p>
           </div>
         </div>
+
+        <button
+          onClick={() => window.location.href = "/dashboard/projects"}
+          className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-[#1F1F23] bg-white dark:bg-[#141418] px-3 py-1.5 text-xs text-gray-900 dark:text-white transition-colors hover:bg-gray-50 dark:hover:bg-[#1F1F23]"
+        >
+          <Folder className="h-4 w-4" />
+          <span>مشاريعي</span>
+        </button>
       </div>
 
       {/* Points Bar */}
